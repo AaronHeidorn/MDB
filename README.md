@@ -61,7 +61,7 @@ This is the entire MDB class:
 	    @Resource
 	    private MessageDrivenContext mdc;
 	    
-	    
+		
 		public void ejbCreate() {
 			try{
 				logger.warn("Committing global transaction on MDB upon creation");
@@ -69,6 +69,9 @@ This is the entire MDB class:
 				//remove global transaction from MDB
 				//transactions are needed on a message by message basis - 
 				//not globally on the MDB itself
+
+				//This is a 'hack' to get around global transactions timing out
+				//This is what I'm trying to avoid/fix
 				mdc.getUserTransaction().commit();
 				
 			} catch (SecurityException e) {
