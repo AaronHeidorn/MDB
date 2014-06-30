@@ -10,7 +10,7 @@ This is the producer that sets messages on a queue for an MDB.  Exception handli
 	JMSConnectionFactory = (ConnectionFactory) ctx.lookup("jms/MQFactory");
 			  
 	conn = JMSConnectionFactory.createConnection();
-	session = conn.createSession(false, Session.CLIENT_ACKNOWLEDGE);
+	session = conn.createSession(false, Session.AUTO_ACKNOWLEDGE);
 	Destination destination = session.createQueue(qName);
 	MessageProducer producer = session.createProducer(destination);
 
@@ -21,20 +21,16 @@ This is the entire MDB class:
 
 	package com.bcbst.batchworker.jms;
 	
-	import javax.annotation.Resource;
 	import javax.ejb.ActivationConfigProperty;
 	import javax.ejb.MessageDriven;
-	import javax.ejb.MessageDrivenContext;
+	import javax.ejb.TransactionAttribute;
+	import javax.ejb.TransactionAttributeType;
 	import javax.ejb.TransactionManagement;
 	import javax.ejb.TransactionManagementType;
 	import javax.jms.JMSException;
 	import javax.jms.Message;
 	import javax.jms.MessageListener;
 	import javax.jms.ObjectMessage;
-	import javax.transaction.HeuristicMixedException;
-	import javax.transaction.HeuristicRollbackException;
-	import javax.transaction.RollbackException;
-	import javax.transaction.SystemException;
 	
 	import org.apache.log4j.Logger;
 	
@@ -54,40 +50,11 @@ This is the entire MDB class:
 			                              propertyValue = "jms/EBSDBatch")
 			  }
 			)
-	@TransactionManagement(TransactionManagementType.BEAN)
+	@TransactionManagement(TransactionManagementType.CONTAINER)
+	@TransactionAttribute(TransactionAttributeType.REQUIRED)
 	public class MessageDrivenBean implements MessageListener {
 		private Logger logger = Utils.getLogger(MessageDrivenBean.class);
 	
-	    @Resource
-	    private MessageDrivenContext mdc;
-	    
-		
-		public void ejbCreate() {
-			try{
-				logger.warn("Committing global transaction on MDB upon creation");
-				
-				//remove global transaction from MDB
-				//transactions are needed on a message by message basis - 
-				//not globally on the MDB itself
-
-				//This is a 'hack' to get around global transactions timing out
-				//This is what I'm trying to avoid/fix
-				mdc.getUserTransaction().commit();
-				
-			} catch (SecurityException e) {
-	    		logger.error("onMessage -> Error committing transaction", e);
-			} catch (IllegalStateException e) {
-	    		logger.error("onMessage -> Error committing transaction", e);
-			} catch (RollbackException e) {
-	    		logger.error("onMessage -> Error committing transaction", e);
-			} catch (HeuristicMixedException e) {
-	    		logger.error("onMessage -> Error committing transaction", e);
-			} catch (HeuristicRollbackException e) {
-	    		logger.error("onMessage -> Error committing transaction", e);
-			} catch (SystemException e) {
-	    		logger.error("onMessage -> Error committing transaction", e);
-			}
-		}
 	    
 	    
 		/**
@@ -108,13 +75,9 @@ This is the entire MDB class:
 		    	} else {
 		    		logger.error("onMessage -> The recieved message was not an ObjectMessage");
 		    	}
-		    	
-		    	//always acknowledge message once to this point.  If processing fails in the run() 
-		    	//method, the appropriate message should be recreated and placed on an error queue
-		    	message.acknowledge();
-				
 			} catch (JMSException e) {
 				logger.error("onMessage -> Error extracting or acknowledging message", e);
 			} 
 	    }
 	}
+
